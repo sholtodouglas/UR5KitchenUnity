@@ -7,16 +7,16 @@ using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 
 namespace RosMessageTypes.RoboticsDemo
 {
-    public class FullState : Message
+    public class Observation : Message
     {
-        public const string RosMessageName = "robotics_demo/FullState";
+        public const string RosMessageName = "robotics_demo/Observation";
 
         public QuaternionProprioState proprio;
         public AchievedGoal ag;
         public Sensor.Image shoulderImage;
         public Sensor.Image gripperImage;
 
-        public FullState()
+        public Observation()
         {
             this.proprio = new QuaternionProprioState();
             this.ag = new AchievedGoal();
@@ -24,7 +24,7 @@ namespace RosMessageTypes.RoboticsDemo
             this.gripperImage = new Sensor.Image();
         }
 
-        public FullState(QuaternionProprioState proprio, AchievedGoal ag, Sensor.Image shoulderImage, Sensor.Image gripperImage)
+        public Observation(QuaternionProprioState proprio, AchievedGoal ag, Sensor.Image shoulderImage, Sensor.Image gripperImage)
         {
             this.proprio = proprio;
             this.ag = ag;
@@ -54,7 +54,7 @@ namespace RosMessageTypes.RoboticsDemo
 
         public override string ToString()
         {
-            return "FullState: " +
+            return "Observation: " +
             "\nproprio: " + proprio.ToString() +
             "\nag: " + ag.ToString() +
             "\nshoulderImage: " + shoulderImage.ToString() +

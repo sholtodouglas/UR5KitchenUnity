@@ -1,17 +1,18 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.ComponentModel;
 using UnityEngine;
 using UnityEngine.Rendering;
 using static System.Linq.Enumerable;
 using Unity.Robotics.ROSTCPConnector;
-using jointCommand = RosMessageTypes.RoboticsDemo.JointPositions;
-using positionCommand = RosMessageTypes.RoboticsDemo.PositionCommand;
-using quaternionCommand = RosMessageTypes.RoboticsDemo.QuaternionCommand;
-using armState = RosMessageTypes.RoboticsDemo.ArmState;
-using ImageTest = RosMessageTypes.RoboticsDemo.ImageTest;
-using FullState = RosMessageTypes.RoboticsDemo.FullState;
+using JointPositions = RosMessageTypes.RoboticsDemo.JointPositions;
+using PositionCommand = RosMessageTypes.RoboticsDemo.PositionCommand;
+using QuaternionProprioState = RosMessageTypes.RoboticsDemo.QuaternionProprioState;
+using Observation = RosMessageTypes.RoboticsDemo.Observation;
+using ResetInfo = RosMessageTypes.RoboticsDemo.ResetInfo;
+using AchievedGoal = RosMessageTypes.RoboticsDemo.AchievedGoal;
 //
 using RosMessageTypes.RoboticsDemo; // this is named after the folder you used to import msgs
 using UnityEngine.XR; 
@@ -28,9 +29,9 @@ public class VRControllerController: MonoBehaviour
     public float forceLimit=1000;
     public float speed = 30f; // Units: degree/s
     public float torque = 100f; // Units: Nm or N
-    public float acceleration = 10f;// Units: m/s^2 / degree/s^2
+    public float acceleration = 50f;// Units: m/s^2 / degree/s^2
     // End robot public stuff
-    private int ee_index = 8; // this is the eelink - TODO: adapted once we have a gripper
+    private int ee_index = 8; // this is the eelink
 
     public GameObject handAnchor;
     public bool useVR = true;
@@ -46,6 +47,7 @@ public class VRControllerController: MonoBehaviour
 
     // Control / GUI specific stuff
     public bool joint_cntrl = false;
+    public bool local_cntrl = false;
     // private List<float> jointSliderVals = new List<float>{ 
     //     0.00F, 
     //     -51.109F, 
@@ -95,9 +97,8 @@ public class VRControllerController: MonoBehaviour
     //         ("right_inner_finger",  18, 2),
     //         ("right_inner_knuckle", 20, 2),
     // };
-    private FullState resetSt = new FullState();
-    private bool resettingState = false;
-    private float threshold = 0.5F;
+
+    // private float threshold = 0.5F;
 
     private int num_joints;
 
@@ -113,8 +114,33 @@ public class VRControllerController: MonoBehaviour
     // Used so we can ignore messages stuck in the ros pipeline from before restarts
     private long restartTime;
 
+    // The gripper angles are weird and do not correspond to the motor command, store requisite offsets
+    // s.t open is 0 deg and closed is 40 deg here
+    private float left_outer_knuckle_offset = -228.48f;
+    // private float left_inner_finger_offset = -41.5f;
+    // private float left_inner_knuckle_offset = 131.5f;
+    // private float right_outer_knuckle_offset = -48.46f;
+    // private float right_inner_finger_offset = -41.5f;
+    // private float right_inner_knuckle_offset = -48.46f;
 
+    IEnumerator EngageForceAfterInit()
+    {
+        print("Start waiting");
 
+        yield return new WaitForSeconds(2);
+        int defDyanmicVal = 10;
+        foreach (ArticulationBody joint in articulationChain)
+        {
+            // Set up each of the joints
+            joint.gameObject.AddComponent<JointControl>();
+            joint.jointFriction = defDyanmicVal;
+            joint.angularDamping = defDyanmicVal;
+            ArticulationDrive currentDrive = joint.xDrive;
+            currentDrive.forceLimit = forceLimit;
+            joint.xDrive = currentDrive;
+        }
+        
+    }
 
 
     // Start is called before the first frame update
@@ -134,7 +160,11 @@ public class VRControllerController: MonoBehaviour
         restartTime = ((DateTimeOffset)foo).ToUnixTimeSeconds();
 
         // Set up a subscriber to listen to commands
-        ROSConnection.instance.Subscribe<jointCommand>("joint_commands", executeCommand);
+        ROSConnection.instance.Subscribe<JointPositions>("joint_commands", executeCommand);
+
+        //
+        ROSConnection.instance.Subscribe<AchievedGoal>("reset_environment", resetEnvironment);
+
 
         // Set up the arm variables
         this.gameObject.AddComponent<FKRobot>();
@@ -148,11 +178,11 @@ public class VRControllerController: MonoBehaviour
             joint.jointFriction = defDyanmicVal;
             joint.angularDamping = defDyanmicVal;
             ArticulationDrive currentDrive = joint.xDrive;
-            currentDrive.forceLimit = forceLimit;
+            currentDrive.forceLimit = 10;
             joint.xDrive = currentDrive;
             print(joint);
         }
-        
+        EngageForceAfterInit();
         
         num_joints = articulationChain.Length;
 
@@ -173,8 +203,7 @@ public class VRControllerController: MonoBehaviour
         gripperRenderTexture = new RenderTexture(64, 64, 24, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8B8A8_SRGB); // this is very important
         gripperRenderTexture.Create();
 
-        resetSt.upper_arm_link = 45.0F;
-        resetState(resetSt);
+        reset_to_default();
 
         
         
@@ -187,7 +216,7 @@ public class VRControllerController: MonoBehaviour
         DateTime foo = DateTime.Now;
         long unixTime = ((DateTimeOffset)foo).ToUnixTimeSeconds();
 
-        jointCommand cmd = new jointCommand(
+        JointPositions cmd = new JointPositions(
                 jointSliderVals[1],// 1 - shoulder
                 jointSliderVals[2],// 2 - upper arm
                 jointSliderVals[3],// 3 - forearm 
@@ -205,7 +234,7 @@ public class VRControllerController: MonoBehaviour
 
     // broadcast XYZRPY, which will get converted to joint commands by the ROS server - exactly as though they came from the AI!
     void commandXYZPositions() {
-        positionCommand cmd = new positionCommand(
+        PositionCommand cmd = new PositionCommand(
                 XYZRPYSliderVals[0],// x
                 XYZRPYSliderVals[1],// y
                 XYZRPYSliderVals[2],// z 
@@ -233,7 +262,7 @@ public class VRControllerController: MonoBehaviour
 
             Transform handPos = handAnchor.transform;
             // print();
-            quaternionCommand cmd = new quaternionCommand(
+            QuaternionState cmd = new QuaternionState(
                 handPos.position.x,
                 handPos.position.y,
                 handPos.position.z,
@@ -294,47 +323,29 @@ public class VRControllerController: MonoBehaviour
 
     }
 
+    AchievedGoal GetAchievedGoal() {
 
+        Transform obj_pose = obj1.transform;
 
-    void publishStates()
-        {
-            // arm information
+        AchievedGoal ag = new AchievedGoal(
+                obj_pose.position.x, //start obj
+                obj_pose.position.y,
+                obj_pose.position.z,
+                obj_pose.rotation.x,
+                obj_pose.rotation.y,
+                obj_pose.rotation.z,
+                obj_pose.rotation.w); // end obj 
+
+        return ag;
+
+    }
+
+    QuaternionProprioState GetQuaternionProprioState() {
+        // arm information
             Transform grasp_target = articulationChain[ee_index].transform;
             Transform ee_info = articulationChain[ee_index-1].transform;
-
-            // obj 
-            Transform obj_pose = obj1.transform;
-
-            // camera stuff
-            RosMessageTypes.Sensor.Image shoulderImage = takeImage(shoulderRenderTexture, shoulderCam);
-            RosMessageTypes.Sensor.Image gripperImage = takeImage(gripperRenderTexture, gripperCam);
-
-            // 
-
-            FullState state = new FullState(
-                0.0F, // base_link always 0
-                -articulationChain[1].transform.eulerAngles.y, // shoulder_link,
-                articulationChain[2].transform.eulerAngles.x, // upper_arm_link,
-                articulationChain[3].transform.eulerAngles.x, // forearm_link,
-                articulationChain[4].transform.eulerAngles.x, // wrist_1_link,
-                -articulationChain[5].transform.eulerAngles.y, // wrist_2_link,
-                articulationChain[6].transform.eulerAngles.x, // wrist_3_link,
-                0.0F, // ee_link, don't set any of these - confirm
-                0.0F, // grasptarget,
-                0.0F, // tool0,
-                0.0F, // robotiq_arg2f_base_link,
-                articulationChain[11].transform.eulerAngles.z, // left_outer_knuckle,
-                0.0F, // left_outer_finger,
-                articulationChain[13].transform.eulerAngles.z, // left_inner_finger,
-                0.0F, // left_inner_finger_pad,
-                articulationChain[15].transform.eulerAngles.z, // left_inner_knuckle,
-                articulationChain[16].transform.eulerAngles.z, // right_outer_knuckle,
-                0.0F, // right_outer_finger,
-                articulationChain[18].transform.eulerAngles.z, // right_inner_finger,
-                0.0F, // right_inner_finger_pad,
-                articulationChain[20].transform.eulerAngles.z, // right_inner_knuckle,
-                shoulderImage,
-                gripperImage,
+        // 
+            QuaternionProprioState proprio = new QuaternionProprioState(
                 grasp_target.position.x, //start arm
                 grasp_target.position.y,
                 grasp_target.position.z,
@@ -342,61 +353,137 @@ public class VRControllerController: MonoBehaviour
                 ee_info.rotation.y,
                 ee_info.rotation.z,
                 ee_info.rotation.w,
-                0, // TODO Gripper end arm
-                obj_pose.position.x, //start obj
-                obj_pose.position.y,
-                obj_pose.position.z,
-                obj_pose.rotation.x,
-                obj_pose.rotation.y,
-                obj_pose.rotation.z,
-                obj_pose.rotation.w // end obj 
+                (articulationChain[11].transform.localEulerAngles.z  + left_outer_knuckle_offset)/40.0F // gripper state from this
             );
-            
-            ros.Send("state", state);
-            
+            return proprio;
     }
 
-    void resetArticulation(int idx, int axis, float value) {
-        Vector3 originalRotation = articulationChain[idx].transform.eulerAngles;
-        Vector3 resetRotation = new Vector3(originalRotation.x, originalRotation.y, originalRotation.z);
-        resetRotation[axis] = value;
-        //articulationChain[idx].transform.eulerAngles = resetRotation; // turns out doesn't work - some conflict between reset and set xdrive?
-        set_articulation_position(idx, value);
-    }
+
+
+    void publishObs()
     
-    bool checkConvergence(FullState state) {
-        if ((-articulationChain[1].transform.eulerAngles.y - state.shoulder_link < threshold) && // shoulder_link,
-        (articulationChain[2].transform.eulerAngles.x -  state.upper_arm_link < threshold) &&
-        (articulationChain[3].transform.eulerAngles.x -  state.forearm_link < threshold) &&
-        (articulationChain[4].transform.eulerAngles.x -  state.wrist_1_link < threshold) &&
-        (-articulationChain[5].transform.eulerAngles.y -  state.wrist_2_link < threshold) &&
-        (articulationChain[6].transform.eulerAngles.x -  state.wrist_3_link < threshold)) {
-            resettingState = false;
-            return true;
-        }
-        print(articulationChain[2].transform.eulerAngles.x -  state.upper_arm_link < 1);
-        print(state.wrist_1_link);
-        return false;
+        {
+             // camera stuff
+            RosMessageTypes.Sensor.Image shoulderImage = takeImage(shoulderRenderTexture, shoulderCam);
+            RosMessageTypes.Sensor.Image gripperImage = takeImage(gripperRenderTexture, gripperCam);
+            
+            Observation state = new Observation(
+                GetQuaternionProprioState(),
+                GetAchievedGoal(), //getCurrentState(),
+                shoulderImage,
+                gripperImage);
+            
+            ros.Send("state", state);    
+    }
+
+    // void resetArticulation(int idx, int axis, float value) {
+    //     //you cant just reset the ransform becasue then the x drive fights against it
+    //     Vector3 originalRotation = articulationChain[idx].transform.eulerAngles;
+    //     Vector3 resetRotation = new Vector3(originalRotation.x, originalRotation.y, originalRotation.z);
+    //     resetRotation[axis] = value;
+    //     //articulationChain[idx].transform.eulerAngles = resetRotation; // turns out doesn't work - some conflict between reset and set xdrive?
+    //     set_articulation_position(idx, value);
+    // }
+    
+    // bool convergingToReset(ResetInfo state) {
+
+    //     // Would be great to so something like this, but get properties doesnt seem to work 
+    //     // PropertyInfo[] properties = state.GetProperties();
+    //     //     print(properties);
+    //     //     foreach (PropertyInfo pi in properties)
+    //     //     {
+    //     //         print(string.Format("Name: {0} | Value: {1}", pi.Name, pi.GetValue(proprio, null)));
+    //     //     }
+        
+
+    //     if ((Math.Abs(-articulationChain[1].transform.eulerAngles.y - state.shoulder_link) < threshold)&
+    //     (Math.Abs(wrapEuler(articulationChain[2].transform.eulerAngles.x) -  state.upper_arm_link) < threshold)&
+    //     (Math.Abs(wrapEuler(articulationChain[3].transform.eulerAngles.x) -  state.forearm_link) < threshold)&
+    //     (Math.Abs(wrapEuler(articulationChain[4].transform.eulerAngles.x) -  state.wrist_1_link) < threshold)&
+    //     (Math.Abs(wrapEuler(-articulationChain[5].transform.eulerAngles.y) -  state.wrist_2_link) < threshold)&
+    //     (Math.Abs(wrapEuler(articulationChain[6].transform.eulerAngles.x) -  state.wrist_3_link) < threshold) &
+    //     // (Math.Abs(articulationChain[11].transform.eulerAngles.z + left_outer_knuckle_offset - state.left_outer_knuckle) < threshold)&
+    //     // (Math.Abs(articulationChain[13].transform.eulerAngles.z + left_inner_finger_offset -  state.left_inner_finger) < threshold)&
+    //     // (Math.Abs(articulationChain[15].transform.eulerAngles.z + left_inner_knuckle_offset -  state.left_inner_knuckle) < threshold)&
+    //     // (Math.Abs(articulationChain[16].transform.eulerAngles.z + right_outer_knuckle_offset -  state.right_outer_knuckle) < threshold)&
+    //     // (Math.Abs(articulationChain[18].transform.eulerAngles.z + right_inner_finger_offset -  state.right_inner_finger) < threshold)&
+    //     // (Math.Abs(articulationChain[20].transform.eulerAngles.z + right_inner_knuckle_offset -  state.right_inner_knuckle) < threshold)&
+    //     (Math.Abs(obj1.transform.position.x -  state.obj1_pos_x) < threshold) &
+    //     (Math.Abs(obj1.transform.position.y -  state.obj1_pos_y) < threshold) &
+    //     (Math.Abs(obj1.transform.position.z -  state.obj1_pos_z) < threshold) &
+    //     (Math.Abs(obj1.transform.rotation.x -  state.obj1_q1) < threshold) &
+    //     (Math.Abs(obj1.transform.rotation.y -  state.obj1_q2) < threshold) &
+    //     (Math.Abs(obj1.transform.rotation.z -  state.obj1_q3) < threshold) &
+    //     (Math.Abs(obj1.transform.rotation.w -  state.obj1_q4) < threshold))
+    //     {
+
+            
+    //         return false;
+    //     } else {
+    //         //print(wrapEuler(articulationChain[2].transform.eulerAngles.x));
+            
+    //         print(state.forearm_link);
+    //         print(   (Math.Abs(wrapEuler(articulationChain[3].transform.eulerAngles.x) -  state.forearm_link) < threshold)   );
+    //         // print(state.left_outer_knuckle);
+    //         // print(articulationChain[11].transform.rotation.z);
+    //         // print(articulationChain[11].transform.eulerAngles.z + left_outer_knuckle_offset);
+    //         // print(((Math.Abs(articulationChain[11].transform.eulerAngles.z + left_outer_knuckle_offset - state.left_outer_knuckle) < threshold)));
+    //         return false;
+    //     }
+    // }
+
+
+    void reset_to_default() {
+
+
+        JointPositions joints = new JointPositions();
+        joints.shoulder = -51.0F;
+        joints.upper_arm = -12.7F;
+        joints.forearm = -109.44F;
+        joints.wrist_1 = -57.85F;
+        joints.wrist_2 = 38.8F;
+        joints.wrist_3 = 0.0F;
+        joints.gripper = 0.0F;
+
+        executeCommand(joints);
+
+        resetEnvironment(GetAchievedGoal());
     }
 
     // Given a full state, resets
-    void resetState(FullState state) 
+    void resetEnvironment(AchievedGoal ag) 
     {
-        resettingState = true;
-        resetSt = state;
-        // Have to do it this way as its better than modifying the ros message class (which is autogenned)
-        resetArticulation(1, 1,  state.shoulder_link);
-        resetArticulation(2, 0,  state.upper_arm_link);
-        resetArticulation(3, 0,  state.forearm_link);
-        resetArticulation(4, 0,  state.wrist_1_link);
-        resetArticulation(5, 1,  state.wrist_2_link);
-        resetArticulation(6, 0,  state.wrist_3_link);
-
-        checkConvergence(state);
+        // reset object 1
+        obj1.transform.rotation = new Quaternion(ag.obj1_q1, ag.obj1_q2, ag.obj1_q3, ag.obj1_q4);
+        obj1.transform.position = new Vector3(ag.obj1_pos_x, ag.obj1_pos_y, ag.obj1_pos_z);
 
     }
 
    // ####################### Subscribers ##############################################
+   void grip(float percent) {
+        // Left hand side of the gripper
+        
+        float outer_knuckle_closed = 40;
+        float inner_finger_closed = 40;
+        float inner_knuckle_closed = -40;
+
+        // the outer knuckle should be constrainted to how closed the inner finger is, and the inner knuckle to how closed the outer knuckle is
+        // inner fingers
+        // outer knuckles
+        set_articulation_position(11, percent*outer_knuckle_closed);
+        set_articulation_position(16, percent*-outer_knuckle_closed);
+
+        set_articulation_position(13, Math.Min(percent, getKnucklePos(articulationChain[11].transform.localEulerAngles.z))*inner_finger_closed);
+        set_articulation_position(18, Math.Min(percent, getKnucklePos(articulationChain[16].transform.localEulerAngles.z))*inner_finger_closed);
+        
+        
+        //inner knuckles
+        set_articulation_position(15, Math.Min(percent, getKnucklePos(articulationChain[11].transform.localEulerAngles.z))*inner_knuckle_closed);
+        set_articulation_position(20, Math.Min(percent, getKnucklePos(articulationChain[16].transform.localEulerAngles.z))*inner_knuckle_closed);
+
+
+    }
+
     void set_articulation_position(int idx, float position)
     {
         ArticulationDrive currentDrive = articulationChain[idx].xDrive;
@@ -404,34 +491,20 @@ public class VRControllerController: MonoBehaviour
         articulationChain[idx].xDrive = currentDrive;
     }
 
-    void grip(float percent) {
-        // Left hand side of the gripper
-        
-        float outer_knuckle_closed = 40;
-        float inner_finger_closed = 40;
-        float inner_knuckle_closed = -40;
-        set_articulation_position(11, percent*outer_knuckle_closed);
-        set_articulation_position(13, percent*inner_finger_closed);
-        set_articulation_position(15, percent*inner_knuckle_closed);
-        //print(articulationChain[15].jointPosition);
-
-        // Right side
-        set_articulation_position(16, percent*-outer_knuckle_closed);
-        set_articulation_position(18, percent*inner_finger_closed);
-        set_articulation_position(20, percent*inner_knuckle_closed);
-
-
-    }
+    
     // this subscriber is called when joint commands happen, which can be 
     // because a VR controller has pinged the IK server, or the joint sliders have sent out a topic
-   void executeCommand(jointCommand command)
+   void executeCommand(JointPositions command)
     {
-        print("Recieved");
+        
         DateTime foo = DateTime.Now;
         long unixTime = ((DateTimeOffset)foo).ToUnixTimeSeconds();
         
-        if (!resettingState) { // if we are in the middle of resetting state, don't do anything
-            //adding elements using collection-initializer syntax
+        if (unixTime > restartTime+2) {
+                //adding elements using collection-initializer syntax
+                // command.shoulder = Math.Min(Math.Max(command.shoulder, -140F), 60F);
+                // command.upper_arm = Math.Min(Math.Max(command.upper_arm, -80F), 90F);
+                // command.forearm = Math.Min(Math.Max(command.forearm, -130F), -10F);
             var positions = new List<float>{ 
                 0.00F, command.shoulder, command.upper_arm,command.forearm,command.wrist_1,command.wrist_2,command.wrist_3};
             // include the base non joint through the 0F
@@ -440,40 +513,83 @@ public class VRControllerController: MonoBehaviour
             }
             grip(command.gripper);
         }
+        
     }
 
+    void checkButtons() {
+
+        if (OVRInput.GetDown(OVRInput.RawButton.X)) {
+            print("resetting");
+            // Premeptively reset it to a nice position
+            JointPositions joints = new JointPositions();
+            joints.shoulder = -51.0F;
+            joints.upper_arm = -12.7F;
+            joints.forearm = -109.44F;
+            joints.wrist_1 = -57.85F;
+            joints.wrist_2 = 38.8F;
+            joints.wrist_3 = 0.0F;
+            joints.gripper = 0.0F;
+
+            executeCommand(joints);
+
+            // Block the arm from accepting any new joint commands for 2s
+            DateTime foo = DateTime.Now;
+            restartTime = ((DateTimeOffset)foo).ToUnixTimeSeconds();
+
+            // create an actual reset request to the big controller in the sky
+            // s.t it doesn't send any new requests or save any data etc, saves the trajectory etc
+            RPYProprioState proprio = new RPYProprioState();
+            proprio.pos_x = -0.4F;
+            proprio.pos_y = 0.2F;
+            proprio.pos_z = 0.0F;
+            RPYState r = new RPYState(
+                    proprio,
+                    GetAchievedGoal() // randomize this up above if desired
+            );
+            ros.Send("reset", r);
+        }
+    }
     // Update is called once per frame
     void Update()
     {
-        if (resettingState) { // if we are in the middle of resetting state, check if it has converged
-                checkConvergence(resetSt);
-        }
-        
         timeElapsed += Time.deltaTime;
         if (timeElapsed > publishMessageFrequency)
         {
-            if (joint_cntrl == true) 
-            {
-                //print(joint_cntrl);
+            // print($"should {-articulationChain[1].transform.localEulerAngles.y}"  );
+            // print($"upper {articulationChain[2].transform.localEulerAngles.x} " );
+            // print($"forearm {articulationChain[3].transform.localEulerAngles.x}  ");
+            // print($"w1 {articulationChain[4].transform.localEulerAngles.x} ");
+            // print($"w2 {-articulationChain[5].transform.localEulerAngles.y}  ");
 
+            print($" left_outer_knuckle {getKnucklePos(articulationChain[11].transform.localEulerAngles.z)} ");
+            print($" left_inner_finger {getFingerPos(articulationChain[13].transform.localEulerAngles.z)} ");
+            // print($" left_inner_knuckle {articulationChain[15].transform.localEulerAngles.z} ");
+            // print($" right_outer_knuckle {articulationChain[16].transform.localEulerAngles.z} ");
+            // print($" right_inner_finger {articulationChain[18].transform.localEulerAngles.z} ");
+            // print($" right_inner_knuckle {articulationChain[20].transform.localEulerAngles.z} ");
+
+            // if (resettingState) { // if we are in the middle of resetting state, check if it has converged
+            //     resetState(resetSt); // recall this to reset transforms if theyve been moved as the articulation moves into posiitoni
+            //     resettingState = convergingToReset(resetSt);
+            //     // print("Still Resetting");
+
+            // }  else { 
+            if (joint_cntrl & local_cntrl) {// commanding from here not from some AI
                 broadcastJointPositions();
-                
-            }
-            else 
-            {
-                if (OVRManager.isHmdPresent & useVR) {
-                    commandXYZQuatPositions();
-                } else {
-                    commandXYZPositions();
                 }
-                
-                
-            }
-            publishStates();
-            timeElapsed = 0;
-        }
-        
+            else if (local_cntrl) { // commanding from here not from some AI
+                commandXYZPositions();
+                }
+            else if (OVRManager.isHmdPresent & useVR & !local_cntrl) {
+                checkButtons();
+                commandXYZQuatPositions();
+                }
+                    
+                publishObs();
+                timeElapsed = 0;
+        }   
     }
+        
 
     void OnGUI()
     {
@@ -499,6 +615,14 @@ public class VRControllerController: MonoBehaviour
         }
         
     }
-    
+
+    float getFingerPos(float f) {
+        return -(f-41.5F)/40.0f;
+    }
+
+    float getKnucklePos(float k) {
+        return (k  +  -228.48f)/40.0F; // gripper state from this
+    }
+
 }
 }

@@ -18,7 +18,7 @@ namespace RosMessageTypes.RoboticsDemo
         public float wrist_2;
         public float wrist_3;
         public float gripper;
-        public long time;
+        public double time;
 
         public JointPositions()
         {
@@ -29,10 +29,10 @@ namespace RosMessageTypes.RoboticsDemo
             this.wrist_2 = 0.0f;
             this.wrist_3 = 0.0f;
             this.gripper = 0.0f;
-            this.time = 0;
+            this.time = 0.0;
         }
 
-        public JointPositions(float shoulder, float upper_arm, float forearm, float wrist_1, float wrist_2, float wrist_3, float gripper, long time)
+        public JointPositions(float shoulder, float upper_arm, float forearm, float wrist_1, float wrist_2, float wrist_3, float gripper, double time)
         {
             this.shoulder = shoulder;
             this.upper_arm = upper_arm;
@@ -74,7 +74,7 @@ namespace RosMessageTypes.RoboticsDemo
             offset += 4;
             this.gripper = BitConverter.ToSingle(data, offset);
             offset += 4;
-            this.time = BitConverter.ToInt64(data, offset);
+            this.time = BitConverter.ToDouble(data, offset);
             offset += 8;
 
             return offset;

@@ -206,12 +206,12 @@ MonoBehaviour:
   selectedJoint: 
   selectedIndex: 0
   control: 0
-  stiffness: 10000
+  stiffness: 20000
   damping: 1000
-  forceLimit: 100
+  forceLimit: 1000
   speed: 30
   torque: 100
-  acceleration: 10
+  acceleration: 50
   highLightColor: {r: 255, g: 0, b: 0, a: 255}
 --- !u!114 &20649758
 MonoBehaviour:
@@ -365,12 +365,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 771b8b502a272ed43946d2b5e06a9512, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  stiffness: 10000
+  stiffness: 30000
   damping: 100
   forceLimit: 1000
   speed: 30
   torque: 100
-  acceleration: 10
+  acceleration: 50
   handAnchor: {fileID: 2105265533}
   useVR: 1
   cameraTransform: {fileID: 81917358}
@@ -380,6 +380,7 @@ MonoBehaviour:
   gripperRenderTexture: {fileID: 0}
   obj1: {fileID: 535246415}
   joint_cntrl: 0
+  local_cntrl: 0
   publishMessageFrequency: 0.04
 --- !u!1 &21006922
 GameObject:
@@ -620,7 +621,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 81917358}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: -0.317, z: 0.633}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 57259183}
@@ -1097,7 +1098,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 28
-    target: -57.11894
+    target: 1.3268003
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -3437,7 +3438,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 1000
-    target: 0
+    target: -0.019439697
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -4055,9 +4056,9 @@ ArticulationBody:
   m_Enabled: 1
   m_Mass: 3.7
   m_ParentAnchorPosition: {x: 0, y: 0.089159, z: 0}
-  m_ParentAnchorRotation: {x: 0, y: 0, z: -0.7071068, w: 0.7071068}
+  m_ParentAnchorRotation: {x: 0, y: 0, z: 0.70710677, w: -0.70710677}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
-  m_AnchorRotation: {x: 0, y: 0, z: -0.7071068, w: 0.7071068}
+  m_AnchorRotation: {x: 0, y: 0, z: 0.70710677, w: -0.70710677}
   m_ComputeParentAnchor: 1
   m_ArticulationJointType: 2
   m_LinearX: 1
@@ -4072,7 +4073,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 150
-    target: -58.853283
+    target: -135.45085
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -4170,9 +4171,9 @@ ArticulationBody:
   m_Enabled: 1
   m_Mass: 1
   m_ParentAnchorPosition: {x: -0.089999996, y: 0, z: 0}
-  m_ParentAnchorRotation: {x: 0, y: 0.7071046, z: 0.7071091, w: 0}
+  m_ParentAnchorRotation: {x: 0, y: 0.70710456, z: 0.70710903, w: 0}
   m_AnchorPosition: {x: 0, y: 0, z: 0}
-  m_AnchorRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
+  m_AnchorRotation: {x: 0, y: 0, z: 0.70710677, w: 0.70710677}
   m_ComputeParentAnchor: 1
   m_ArticulationJointType: 0
   m_LinearX: 2
@@ -5185,7 +5186,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 28
-    target: 0.0756014
+    target: -116.762856
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -6518,7 +6519,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 1000
-    target: 0
+    target: -0.019439697
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -6814,7 +6815,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 1000
-    target: -0
+    target: 0.019439697
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -6975,7 +6976,11 @@ PrefabInstance:
     - target: {fileID: -7511558181221131132, guid: 5eae1725ce6809f44961a8aaea33bfa3, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 8919e6cc01b56a241aba9b3638b85c93, type: 2}
+      objectReference: {fileID: 2100000, guid: 4c17e56f0761e4a43b8297e0fa2e3242, type: 2}
+    - target: {fileID: -7511558181221131132, guid: 5eae1725ce6809f44961a8aaea33bfa3, type: 3}
+      propertyPath: m_Materials.Array.data[1]
+      value: 
+      objectReference: {fileID: 2100000, guid: 4c17e56f0761e4a43b8297e0fa2e3242, type: 2}
     - target: {fileID: 919132149155446097, guid: 5eae1725ce6809f44961a8aaea33bfa3, type: 3}
       propertyPath: m_Name
       value: Wrist3
@@ -8471,7 +8476,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 28
-    target: 31.101122
+    target: 133.65793
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -8605,7 +8610,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 150
-    target: -113.174355
+    target: -69.193245
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -10001,13 +10006,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1396515315}
-  m_LocalRotation: {x: -0.061628632, y: -0.061628215, z: 0.7044138, w: 0.7044183}
-  m_LocalPosition: {x: 0.03, y: 0.067, z: 0.003}
+  m_LocalRotation: {x: 0.12278779, y: -0.12278779, z: 0.6963643, w: 0.6963643}
+  m_LocalPosition: {x: -0.0023, y: 0.093, z: 0.0593}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 619260263}
   m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: -100, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 20, y: 0, z: 90}
 --- !u!114 &1396515317
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10071,9 +10076,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.01
+  near clip plane: 0.05
   far clip plane: 10
-  field of view: 40
+  field of view: 57
   orthographic: 0
   orthographic size: 5
   m_Depth: 0
@@ -11587,7 +11592,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 1000
-    target: -0
+    target: 0.019439697
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -12068,7 +12073,7 @@ ArticulationBody:
     stiffness: 0
     damping: 0
     forceLimit: 150
-    target: -9.795038
+    target: -30.145845
     targetVelocity: 0
   m_YDrive:
     lowerLimit: 0
@@ -12958,7 +12963,7 @@ PrefabInstance:
     - target: {fileID: -7872050761866051451, guid: 59f0a47770271514d91d7c5f7d9cc2cc, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: 8919e6cc01b56a241aba9b3638b85c93, type: 2}
+      objectReference: {fileID: 2100000, guid: 4c17e56f0761e4a43b8297e0fa2e3242, type: 2}
     - target: {fileID: -5959735615997675628, guid: 59f0a47770271514d91d7c5f7d9cc2cc, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
